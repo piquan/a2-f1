@@ -1,0 +1,26 @@
+{
+  "name": "cpanel",
+  "version": "0.0.1",
+  "description": "Control panel webserver for A2-F1",
+  "author": "Joel Ray Holveck <joelh@piquan.org>",
+  "repository": "",
+  "private": true,
+  
+  "main": "cpanel.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  
+  "engines": { "node" : "^0.10.40" },
+  "dependencies": {
+    "express": "^4.13.4",
+    "nodemon": "^1.8.1",
+    "socket.io": "^1.4.5",
+    "ws": "^1.0.1"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^1.2.1",
+    "utf-8-validate": "^1.2.1"
+  },
+  "devDependencies": {}
+}

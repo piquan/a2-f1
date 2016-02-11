@@ -1,0 +1,6 @@
+[submodule "webclient/blockly"]
+	path = webclient/blockly
+	url = https://github.com/google/blockly.git
+[submodule "webclient/JS-Interpreter"]
+	path = webclient/JS-Interpreter
+	url = https://github.com/NeilFraser/JS-Interpreter.git
