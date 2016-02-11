@@ -1,0 +1,21 @@
+{
+    "user": "pi",
+    "group": "pi",
+
+    "public_port": 80,
+    "public_ipv4": "*",
+    "public_ipv6": "[::]",
+    "logdir": "/run/a2-f1/log",
+    "nginx_servername": "$hostname",
+
+    "nodejs": "/usr/bin/nodejs",
+
+    "cpanel_ip": "127.0.0.1",
+    "cpanel_port": 8081,
+
+    "camdir": "/run/a2-f1/cam",
+    "cammgr_url": "ws://127.0.0.1:8081/cam/mgr",
+
+    "use_camera": "if-enabled",
+    "use_video_port": false
+}

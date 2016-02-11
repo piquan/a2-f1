@@ -1,35 +1,50 @@
-#! ./ENV/bin/python
+#! ./env/bin/python
 
 import asyncio
 import concurrent.futures
 import errno
-import logging
+import io
 import json
+import logging
 import os
 import shutil
 import time
 import websockets
 
 
-with open(os.path.join(os.path.dirname(__file__), "..", "system", "config.json")) as f:
+with open(os.path.join(os.path.dirname(__file__), "..",
+                       "config", "default.json")) as f:
     config = json.load(f)
-    print(repr(config))
 
 
 class RealCamera(object):
     def __enter__(self):
         import picamera
         self.cam = picamera.PiCamera(resolution=(640,480)).__enter__()
+        self.buf = io.BytesIO()
+        # With use_video_port turned on, we can get 30fps video, and
+        # surprisingly, it only brings the load average to 0.80 or so
+        # (about 25% Python, 8% Node.js, and 6% Nginx, give or take).
+        # It does, however, slow down my laptop to render this fast.
+        self.capiter = iter(self.cam.capture_continuous(self.buf, format='jpeg',
+            use_video_port=config['use_video_port']))
         return self
     def __exit__(self, *args, **kwargs):
-        self.cam.__exit__(*args, **kwargs)
-    def wait(self):
-        pass
+        self.buf.close()
+        return self.cam.__exit__(*args, **kwargs)
     @asyncio.coroutine
+    def wait(self):
+        # Use this to yield to the scheduler, and let it process any
+        # pending data on the manager socket.
+        yield from asyncio.sleep(0)
     def capture(self, filename):
-        self.cam.capture(filename)
+        self.capiter.__next__()
+        with open(filename, 'wb') as fh:
+            fh.write(self.buf.getbuffer())
+        self.buf.seek(0)
+        self.buf.truncate()
         
-        
+
 class FakeCamera(object):
     def __enter__(self):
         self.serial = 1
@@ -38,6 +53,10 @@ class FakeCamera(object):
         pass
     @asyncio.coroutine
     def wait(self):
+        # The real camera currently runs at about 2fps unless
+        # use_video_port is on.  We limit the FakeCamera to 0.1fps
+        # because we really have no need to clog up networks,
+        # particularly if I'm coding on Cloud9 or something.
         yield from asyncio.sleep(10)
     def capture(self, filename):
         logging.debug("Using test image %i", self.serial)
@@ -45,23 +64,38 @@ class FakeCamera(object):
                                  "motion%02i.jpg" % self.serial),
                     filename)
         self.serial = (self.serial % 10) + 1
-        
-        
-def getcam():
-    if config['usecamera']:
-        return RealCamera()
-    else:
-        return FakeCamera()
+
+ 
+class RealOrFakeCamera(object):
+    def __enter__(self):
+        use_camera = config['use_camera']
+        if use_camera == 'if-enabled':
+            try:
+                import picamera
+                self.backing = RealCamera()
+                return self.backing.__enter__()
+            except (ImportError, picamera.exc.PiCameraMMALError,
+                    picamera.exc.PiCameraError):
+                self.backing = FakeCamera()
+                return self.backing.__enter__()
+        elif use_camera == True:
+            self.backing = RealCamera()
+            return self.backing.__enter__()
+        elif use_camera == False:
+            self.backing = FakeCamera()
+            return self.backing.__enter__()
+        raise Exception('config["use_camera"] must be true, false, or "if-enabled", not %r', use_camera)
+    def __exit__(self, *args, **kwargs):
+        return self.backing.__exit__(*args, **kwargs)
 
 
 @asyncio.coroutine
 def handle_camera(ws, client_event, loop):
     serial = 0
-    camera = getcam()
     while True:
         yield from client_event.wait()
-        logging.debug("Clients connected, taking pictures")
-        with getcam() as camera:
+        logging.info("Clients connected; activating")
+        with RealOrFakeCamera() as camera:
             logging.debug("Taking picture %i from %s", serial, repr(camera))
             while client_event.is_set():
                 filename = 'image%02i.jpg' % serial
@@ -71,7 +105,7 @@ def handle_camera(ws, client_event, loop):
                 yield from ws.send(msg)
                 serial = (serial + 1) % 100
                 yield from camera.wait()
-        logging.debug("No clients, waiting")
+        logging.info("Clients disconnected; entering standby")
 
 
 @asyncio.coroutine
@@ -92,8 +126,9 @@ def handle_server_messages(ws, client_event, loop):
 
 @asyncio.coroutine
 def asyncmain(loop):
-    logging.basicConfig(level=logging.DEBUG)
-    logging.debug("Initializing")
+    logging.basicConfig(format='%(asctime)s %(message)s',
+                        level=logging.INFO)
+    logging.info("Initializing")
 
     try:
         os.mkdir(config['camdir'])
@@ -107,8 +142,8 @@ def asyncmain(loop):
 
     while True:
         try:
-            logging.debug("Connecting to %s", config['cpanel_cammgr_url'])
-            ws = yield from websockets.connect(config['cpanel_cammgr_url'])
+            logging.debug("Connecting to %s", config['cammgr_url'])
+            ws = yield from websockets.connect(config['cammgr_url'])
             logging.debug("Connected")
 
             tasks = [handle_server_messages(ws, client_event, loop),

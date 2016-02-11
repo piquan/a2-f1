@@ -1,0 +1,50 @@
+# Symlink this into /etc/nginx/sites-available/
+
+server {
+    listen {{public_ipv4}}:{{public_port}} default_server;
+    listen {{public_ipv6}}:{{public_port}} default_server;
+
+    server_name {{nginx_servername}};
+    access_log {{logdir}}/access.log;
+    error_log {{logdir}}/error.log info;
+
+    location = / {
+	    return 301 /c/;
+    }
+
+    location /c/ {
+        alias {{top}}/webclient/htdocs/;
+        autoindex on;
+        index index.html;
+        try_files $uri $uri/ =404;
+    }
+    
+    location /js/ {
+        rewrite (.*) /c/$1;
+    }
+    location /css/ {
+        rewrite (.*) /c/$1;
+    }
+
+    location /cam/img/ {
+        alias {{camdir}}/;
+        autoindex on;
+        try_files $uri =404;
+        {{#unless use_video_port}}
+        expires 30s;
+        {{/unless}}
+    }
+    
+    location / {
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $http_host;
+
+        proxy_pass http://{{cpanel_ip}}:{{cpanel_port}}/;
+        proxy_redirect off;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}

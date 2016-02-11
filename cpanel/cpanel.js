@@ -1,10 +1,10 @@
 "use strict";
 
 var http = require('http');
+var config = require('config');
 var express = require('express');
 var socket_io = require('socket.io');
 var cam = require('./cam.js');
-
 
 function logRequestMiddleware (request, response, next) {
     console.log("]]] Web request:", request.originalUrl);
@@ -52,9 +52,11 @@ exports.init = function() {
     // to the /cam/img/ URL space.
     cam.installHandler(http_server, "/cam/img/", "/cam/mgr", io.of("/cam"));
 
-    // Activate the server.  We only listen on 127.0.0.1, since we rely on
-    // nginx to listen on the public port and redirect accordingly.
-    var port = (+process.env.PORT) + 1;
-    http_server.listen(port, '127.0.0.1');
-    console.log('Server running on port', port);
+    // Activate the server.  We normally only listen on 127.0.0.1,
+    // since we rely on nginx to listen on the public port and
+    // redirect accordingly.
+    var ip = config.get('cpanel_ip');
+    var port = config.get('cpanel_port');
+    http_server.listen(port, ip);
+    console.log('Server running on http://' + ip + ':' + port);
 };

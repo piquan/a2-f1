@@ -1,0 +1,14 @@
+[Unit]
+Description=A2-F1 web control panel
+Wants=nginx.service
+
+[Service]
+Type=simple
+User={{user}}
+Group={{group}}
+ExecStart={{nodejs}} node_modules/nodemon/bin/nodemon.js server.js
+WorkingDirectory={{top}}/cpanel
+Environment="NODE_CONFIG_DIR={{top}}/config"
+
+[Install]
+WantedBy=a2-f1.target

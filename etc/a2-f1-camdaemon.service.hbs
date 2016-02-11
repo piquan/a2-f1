@@ -1,0 +1,11 @@
+[Unit]
+Description=A2-F1 camera daemon
+
+[Service]
+Type=simple
+User={{user}}
+Group={{group}}
+ExecStart={{top}}/camdaemon/env/bin/python {{top}}/camdaemon/camdaemon.py
+
+[Install]
+WantedBy=a2-f1.target

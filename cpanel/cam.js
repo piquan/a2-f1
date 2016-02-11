@@ -74,7 +74,7 @@ CamHandler.prototype.onManagerConnect = function(websocket, callback) {
 };
 
 CamHandler.prototype.onManagerMessage = function(websocket, data, flags) {
-    console.log('Manager:', data);
+    //console.log('Manager:', data);
     var data_obj = JSON.parse(data);
     if ("image" in data_obj) {
         this.sendClientImage(this.camimgurl + data_obj.image);
