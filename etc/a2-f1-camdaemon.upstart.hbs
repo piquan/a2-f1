@@ -1,0 +1,16 @@
+description "A2-F1 camera daemon"
+author "Joel Ray Holveck <joelh@piquan.org>"
+start on starting a2-f1
+stop on stopping a2-f1
+
+pre-start script
+  mkdir {{camdir}}                    || true
+  chmod 0755 {{camdir}}               || true
+  chown {{user}}:{{group}} {{camdir}} || true
+end script
+
+exec {{top}}/camdaemon/env/bin/python {{top}}/camdaemon/camdaemon.py
+console log
+respawn
+setuid {{user}}
+setgid {{group}}

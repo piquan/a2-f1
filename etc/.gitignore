@@ -2,5 +2,8 @@ config.json
 a2-f1.target
 a2-f1-camdaemon.service
 a2-f1-cpanel.service
+a2-f1.upstart
+a2-f1-camdaemon.upstart
+a2-f1-cpanel.upstart
 nginx_site.conf
 tmpfiles.conf

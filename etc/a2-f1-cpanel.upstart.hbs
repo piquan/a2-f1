@@ -1,0 +1,12 @@
+description "A2-F1 web control panel"
+author "Joel Ray Holveck <joelh@piquan.org>"
+start on starting a2-f1
+stop on stopping a2-f1
+
+exec {{nodejs}} node_modules/nodemon/bin/nodemon.js server.js
+chdir {{top}}/cpanel
+env NODE_CONFIG_DIR={{top}}/config
+console log
+respawn
+setuid {{user}}
+setgid {{group}}
