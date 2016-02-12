@@ -4,7 +4,7 @@ set -ex
 
 # Turn this on if you want to actually install files into /etc (as
 # symlinks).  Otherwise, it will just build them.
-install=1
+install=
 
 if [ ! -f ../config/default.json ] ; then
     echo You need to create or symlink ../config/default.json from one 2>&1

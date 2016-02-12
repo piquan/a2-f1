@@ -3,16 +3,18 @@
     "group": "ubuntu",
 
     "public_port": 8080,
-    "listen_ipv4": "*",
-    "listen_ipv6": "[::]",
+    "public_ipv4": "*",
+    "public_ipv6": "[::]",
     "logdir": "/home/ubuntu/log",
     "nginx_servername": "$hostname",
 
-    "cpanel_listen": "127.0.0.1",
+    "nodejs": "/home/ubuntu/.nvm/v0.10.29/bin/node",
+
+    "cpanel_ip": "127.0.0.1",
     "cpanel_port": 8081,
 
     "camdir": "/home/ubuntu/cam",
-    "cammgr_url": "ws://127.0.0.1:8081/cam/mgr"
+    "cammgr_url": "ws://127.0.0.1:8081/cam/mgr",
 
     "use_camera": false,
     "use_video_port": false

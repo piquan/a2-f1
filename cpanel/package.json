@@ -5,14 +5,15 @@
   "author": "Joel Ray Holveck <joelh@piquan.org>",
   "repository": "",
   "private": true,
-  
   "main": "cpanel.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  
-  "engines": { "node" : "^0.10.40" },
+  "engines": {
+    "node": "^0.10.40"
+  },
   "dependencies": {
+    "config": "^1.19.0",
     "express": "^4.13.4",
     "nodemon": "^1.8.1",
     "socket.io": "^1.4.5",
