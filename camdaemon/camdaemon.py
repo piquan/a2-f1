@@ -1,6 +1,7 @@
 #! ./env/bin/python
 
 import asyncio
+import codecs
 import concurrent.futures
 import errno
 import io
@@ -43,7 +44,7 @@ class RealCamera(object):
             fh.write(self.buf.getbuffer())
         self.buf.seek(0)
         self.buf.truncate()
-        
+
 
 class FakeCamera(object):
     def __enter__(self):
@@ -66,27 +67,99 @@ class FakeCamera(object):
         self.serial = (self.serial % 10) + 1
 
  
-class RealOrFakeCamera(object):
-    def __enter__(self):
+class Camera(object):
+    singleton = None
+    def __new__(cls):
+        if cls.singleton is None:
+            cls.singleton = super(Camera, cls).__new__(cls)
+        return cls.singleton
+    def __init__(self):
+        self.users = 0
+        self.backing = None
+        self.backing_withobj = None
+
+    def __get_backing(self):
         use_camera = config['use_camera']
         if use_camera == 'if-enabled':
             try:
                 import picamera
-                self.backing = RealCamera()
-                return self.backing.__enter__()
+                self.backing = RealCamera().__enter__()
+                return self.backing
             except (ImportError, picamera.exc.PiCameraMMALError,
                     picamera.exc.PiCameraError):
-                self.backing = FakeCamera()
-                return self.backing.__enter__()
+                self.backing = FakeCamera().__enter__()
+                return self.backing
         elif use_camera == True:
-            self.backing = RealCamera()
-            return self.backing.__enter__()
+            self.backing = RealCamera().__enter__()
+            return self.backing
         elif use_camera == False:
-            self.backing = FakeCamera()
-            return self.backing.__enter__()
+            self.backing = FakeCamera().__enter__()
+            return self.backing
         raise Exception('config["use_camera"] must be true, false, or "if-enabled", not %r', use_camera)
+
+    def __enter__(self):
+        if self.backing is None:
+            self.backing = self.__get_backing()
+        self.users += 1
+        return self.backing
     def __exit__(self, *args, **kwargs):
-        return self.backing.__exit__(*args, **kwargs)
+        self.users -= 1
+        if self.users == 0:
+            self.backing.__exit__(*args, **kwargs)
+            self.backing = None
+        
+
+@asyncio.coroutine
+def scgi_client_callback(reader, writer):
+    logging.info("New SCGI client")
+    try:
+        headerlen_str = b""
+        while True:
+            headerlen_char = yield from reader.readexactly(1)
+            if headerlen_char == b':':
+                break
+            headerlen_str += headerlen_char
+        headerlen = int(codecs.decode(headerlen_str))
+        header_str = yield from reader.readexactly(headerlen - 1)
+        terminator = yield from reader.readexactly(2)
+        assert terminator == b'\0,'
+        header_array = header_str.split(b'\0')
+        headers = {}
+        while header_array:
+            value = codecs.decode(header_array.pop())
+            key = codecs.decode(header_array.pop())
+            headers[key] = value
+        logging.debug("SCGI request: %r", headers)
+
+        logging.info("%s %s %s", headers["REMOTE_ADDR"],
+                     headers["REQUEST_METHOD"], headers["REQUEST_URI"])
+
+        if headers["REQUEST_METHOD"] != "GET":
+            writer.write(b"Status: 405 Method Not Allowed\r\n\r\n")
+            writer.write_eof()
+            yield from writer.drain()
+            return
+        if headers["DOCUMENT_URI"] == "/cam/vid/_headers":
+            writer.write(b"Status: 200 OK\r\nContent-Type: text/plain\r\n\r\n")
+            writer.write(codecs.encode(repr(headers)))
+            writer.write_eof()
+            yield from writer.drain()
+            return
+        if headers["DOCUMENT_URI"] != "/cam/vid":
+            writer.write(b"Status: 404 Not Found\r\n\r\n")
+            writer.write_eof()
+            yield from writer.drain()
+            return
+
+        writer.write(b"Status: 200 OK\r\nContent-Type: text/plain\r\n\r\n")
+        for i in range(5):
+            writer.write(b"TODO\n")
+            yield from writer.drain()
+            yield from asyncio.sleep(1)
+        writer.write_eof()
+        yield from writer.drain()
+    except asyncio.IncompleteReadError:
+        pass
 
 
 @asyncio.coroutine
@@ -95,7 +168,7 @@ def handle_camera(ws, client_event, loop):
     while True:
         yield from client_event.wait()
         logging.info("Clients connected; activating")
-        with RealOrFakeCamera() as camera:
+        with Camera() as camera:
             logging.debug("Taking picture %i from %s", serial, repr(camera))
             while client_event.is_set():
                 filename = 'image%02i.jpg' % serial
@@ -139,6 +212,9 @@ def asyncmain(loop):
     # Preserve these coroutines throughout the loop, so that they don't
     # lose their state during reconnects.
     client_event = asyncio.Event()
+
+    scgi_server = asyncio.start_server(scgi_client_callback, port=8082,
+                                       loop=loop)
 
     while True:
         try:
