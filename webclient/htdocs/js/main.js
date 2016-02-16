@@ -52,6 +52,28 @@ var a2f1 = {
         return base.protocol + "//" + base.host;
     },
 
+    on_cam_load: function() {
+        if (this.cam_pending) {
+            // This is a tough question: should we load the most
+            // recent image now, or leave the old one on and wait for
+            // a new image to arrive?
+            this.cam.setAttribute("src", this.cam_pending);
+            this.cam_loading = true;
+            this.cam_pending = null;
+            return;
+        }
+        this.cam_loading = false;
+    },
+
+    on_cam_socket: function(data) {
+        if (this.cam_loading) {
+            this.cam_pending = data.url;
+            return;
+        }
+        this.cam.setAttribute("src", data.url);
+        this.cam_loading = true;
+    },
+
     init : function() {
         var rcons = this.rcons;
 
@@ -129,11 +151,13 @@ var a2f1 = {
         socket.on('console', function (data) {
             rcons.print(data.message);
         });
-        
-        this.imgsocket = io(this.robot_uri() + "/cam");
-        this.imgsocket.on('image', function (data) {
-            $("#cam").attr("src", data.url);
-        });
+
+        // We don't go through jQuery for the cam access for performance.
+        // (Not like socket.io is exactly trivial.)
+        this.cam = document.getElementById("cam");
+        this.camsocket = io(this.robot_uri() + "/cam");
+        this.cam.addEventListener("load", this.on_cam_load.bind(this));
+        this.camsocket.on('image', this.on_cam_socket.bind(this));
     }
 };
 
